@@ -1,6 +1,6 @@
 angular.module('CompBrowser.controllers', [])
 
-.controller('MainCtrl', function($scope, $firebase, $firebaseAuth, FBURL) {
+.controller('MainCtrl', function($scope, $firebase, FBURL) {
     'use strict';
     $scope.message = 'APP BASE';
 
@@ -11,59 +11,46 @@ angular.module('CompBrowser.controllers', [])
 })
 
 .controller('RegisterCtrl', function($scope, $firebase, $firebaseAuth, $rootScope, FBURL) {
-    'use strict';
 
+  'use strict';
     var userRef = new Firebase(FBURL + '/users');
+    var ref = new Firebase(FBURL);
+    $scope.authObj = $firebaseAuth(ref);
 
-    // Create a callback which logs the current auth state
-    function authDataCallback(authData) {
-      if (authData) {
-        console.log('User ' + authData.uid + ' is logged in with ' + authData.provider);
-      } else {
-        console.log('User is logged out');
-      }
-    }
-
-    //check to see if user is authenticated
-    userRef.onAuth(authDataCallback);
+    var authData = userRef.getAuth();
+    if (authData) {
+      console.log('User ' + authData.uid + ' is logged in with ' + authData.provider);
+    } else {
+      console.log('User is logged out');
+    };
 
 
 
     $scope.registerUser = function() {
 
-      userRef.createUser({
-        email    : $scope.email,
-        password : $scope.password
-      }, function(error) {
-        if (error === null) {
-          console.log('User created successfully');
+      $scope.authObj.$createUser({
+        email: $scope.email,
+        password: $scope.password
+      }).then(function(userData) {
+        console.log('User ' + userData.uid + ' created successfully!');
 
-          //Generate a random id to store in db
-          var newChildRef = userRef.push();
+        return $scope.authObj.$authWithPassword({
+          email: $scope.email,
+          password: $scope.password
+        });
+      }).then(function(authData) {
+        console.log('Logged in as:', authData.uid);
 
-          //Store user data in the db to reference
-          newChildRef.set({
-            email    : $scope.email,
-            password : $scope.password
-          });
+        ref.child('users').child(authData.uid).set({
+          provider: authData.provider,
+          name: '',
+          email: $scope.email,
+          password: $scope.password
+        });
 
-          //log the person in
-          userRef.authWithPassword({
-            email    : $scope.email,
-            password : $scope.password
-          }, function(error, authData) {
-            if (error) {
-              console.log('Login Failed!', error);
-            } else {
-              console.log('Authenticated successfully with payload:', authData);
-            }
-          });
-
-        } else {
-          console.log('Error creating user:', error);
-        }
+      }).catch(function(error) {
+        console.error('Error: ', error);
       });
-
 
     };
 
